@@ -1,5 +1,5 @@
 updateFoodWasteDatabase <- function(zip = "3450",
-                                    sql_user = "root",
+                                    sql_user = "ruser",
                                     sql_pass = "bondo123",
                                     sql_db   = "SallingGroupFoodWaste",
                                     sql_host = "localhost",
