@@ -1,3 +1,7 @@
+#!/usr/bin/env Rscript
+
+options(warn = -1)   # Fjern unødige warnings i cron
+
 updateFoodWasteDatabase <- function(zip = "3450",
                                     sql_user = "ruser",
                                     sql_pass = "bondo123",
@@ -5,30 +9,40 @@ updateFoodWasteDatabase <- function(zip = "3450",
                                     sql_host = "localhost",
                                     sql_port = 3306) {
   
-  library(httr)
-  library(jsonlite)
-  library(dplyr)
-  library(purrr)
-  library(RMariaDB)
-  library(stringr)
+  # ---- TIMESTAMP START (CLEAN LOG) ----
+  start_time <- Sys.time()
+  cat("\n===========================\n")
+  cat("🚀 Kørsel startet: ", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n")
+  cat("===========================\n\n")
   
-  message("🔄 Henter data fra Salling Group API...")
+  
+  # ---- LOAD PACKAGES ----
+  suppressMessages({
+    library(httr)
+    library(jsonlite)
+    library(dplyr)
+    library(purrr)
+    library(RMariaDB)
+    library(stringr)
+  })
+  
   
   # ---- API CALL ----
+  cat("Henter API data... ")
+  
   baseurl <- "https://api.sallinggroup.com/v1/food-waste/?zip="
   fullurl <- paste0(baseurl, zip)
-  
   mytoken <- 'SG_APIM_76MCVAWZZSB0423GN2FE25FWNMYAXV4JB5AMTQD6EJERP8XD4E20'
   
   res <- GET(fullurl, add_headers(Authorization = paste("Bearer", mytoken)))
   resraw <- content(res, as = "text")
   resraw2 <- fromJSON(resraw, flatten = TRUE)
   
-  message("✅ API data hentet")
+  cat("OK\n")
   
   
   # ---- CLEAN MAIN_DF ----
-  message("🔄 Renser main_df...")
+  cat("Renser main_df... ")
   
   main_df <- resraw2 %>% as.data.frame()
   main_df_clean <- main_df %>%
@@ -42,14 +56,13 @@ updateFoodWasteDatabase <- function(zip = "3450",
     ) %>%
     rename_with(~ gsub("\\.", "_", .x))
   
-  message("✅ main_df klar")
+  cat("OK\n")
   
   
   # ---- CLEAN CLEARANCES ----
-  message("🔄 Renser og samler alle clearances...")
+  cat("Renser clearances... ")
   
   all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
-    
     df <- resraw2$clearances[[i]]
     
     df$store.id <- resraw2$store.id[i]
@@ -68,15 +81,14 @@ updateFoodWasteDatabase <- function(zip = "3450",
   })
   
   all_clearances_df <- bind_rows(all_clearances)
-  
   all_clearances_sql <- all_clearances_df %>%
     rename_with(~ gsub("\\.", "_", .x))
   
-  message("✅ Clearances samlet")
+  cat("OK\n")
   
   
   # ---- SQL CONNECT ----
-  message("🔄 Forbinder til MariaDB...")
+  cat("Forbinder til MariaDB... ")
   
   con <- dbConnect(
     RMariaDB::MariaDB(),
@@ -87,28 +99,29 @@ updateFoodWasteDatabase <- function(zip = "3450",
     dbname = sql_db
   )
   
-  message("✅ Forbundet til MariaDB")
+  cat("OK\n")
   
   
-  # ---- SKRIV main_df ----
-  message("🔄 Skriver til main_df...")
+  # ---- WRITE main_df ----
+  cat("Skriver main_df... ")
   dbWriteTable(con, "main_df", main_df_clean, append = TRUE, row.names = FALSE)
-  message("✅ main_df opdateret")
+  cat("OK\n")
   
   
-  # ---- SKRIV CLEARANCES ----
-  message("🔄 Skriver til store_clearances...")
+  # ---- WRITE CLEARANCES ----
+  cat("Skriver store_clearances... ")
   dbWriteTable(con, "store_clearances", all_clearances_sql, append = TRUE, row.names = FALSE)
-  message("✅ store_clearances opdateret")
+  cat("OK\n")
   
   
-  # ---- SLUT ----
+  # ---- CLOSE ----
   dbDisconnect(con)
-  message("🎉 Database opdatering FÆRDIG! Alt kører nu.")
+  
+  end_time <- Sys.time()
+  
+  cat("\n🎉 Kørsel færdig: ", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n")
+  cat("===========================\n\n")
 }
 
-# ---------------------------------------------------------
-# KØR FUNKTIONEN (DENNE LINJE ER DET DER MANGLEDE)
-# ---------------------------------------------------------
-
+# ---- RUN AUTOMATICALLY ----
 updateFoodWasteDatabase()
