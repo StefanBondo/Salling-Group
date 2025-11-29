@@ -1,7 +1,6 @@
 ####################################################
 # Salling Group - Anti Food Waste
 # Hent data lokalt for flere postnumre
-# HVER linje forklaret
 ####################################################
 
 # Indlæser pakker der bruges til API-kald, JSON parsing og datahåndtering
@@ -20,6 +19,7 @@ zips <- c("3450", "4600", "3600", "3400")
 ####################################################
 get_foodwaste_zip <- function(zip) {
   
+  zip="3450"
   # Bygger URL med det aktuelle postnummer
   url <- paste0("https://api.sallinggroup.com/v1/food-waste/?zip=", zip)
   
@@ -28,6 +28,8 @@ get_foodwaste_zip <- function(zip) {
     url,
     add_headers(Authorization = paste("Bearer", sg_token))
   )
+  
+  res$status_code
   
   # Hvis API’et returnerer fejl (404, 500 osv.) stopper vi denne iteration
   if (http_error(res)) {
@@ -40,7 +42,15 @@ get_foodwaste_zip <- function(zip) {
   raw_txt <- content(res, as = "text", encoding = "UTF-8")
   
   # Konverterer JSON-teksten til en R-liste
-  stores_list <- fromJSON(raw_txt, simplifyVector = FALSE)
+  stores_list <- fromJSON(raw_txt, simplifyVector = FALSE, flatten = TRUE)
+  storedf=as.data.frame(do.call(rbind,stores_list))
+  teststore <- stores_list[[1]]
+  
+  df=teststore$store
+  
+  df=as.data.frame(df)
+  df2=teststore$clearances
+  df2=do.call(rbind,df2)
   
   # Hvis der ingen butikker er i området → returnér NULL
   if (length(stores_list) == 0) return(NULL)
@@ -120,11 +130,7 @@ for (z in zips) {
 
 foodwaste_data <- bind_rows(all_data_list)   # binder alle postnumre sammen
 
-####################################################
-# Undersøg data
-####################################################
 
-head(foodwaste_data)    # viser de første 6 rækker i konsollen
 
 ####################################################
 # Gem resultat som CSV-fil i din projektmappe
@@ -134,4 +140,7 @@ write.csv(foodwaste_data,
           "salling_foodwaste_4_postnumre.csv",
           row.names = FALSE)
 
+rm(geo_foodwaste_df)
 
+
+install.packages("RMariaDB")
