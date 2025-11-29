@@ -1,6 +1,6 @@
 updateFoodWasteDatabase <- function(zip = "3450",
                                     sql_user = "root",
-                                    sql_pass = "PASSWORD",
+                                    sql_pass = "bondo123",
                                     sql_db   = "SallingGroupFoodWaste",
                                     sql_host = "localhost",
                                     sql_port = 3306) {
@@ -40,7 +40,7 @@ updateFoodWasteDatabase <- function(zip = "3450",
       store.address.street,
       store.address.zip
     ) %>%
-    rename_with(~ gsub("\\.", "_", .x))   # gør klar til SQL
+    rename_with(~ gsub("\\.", "_", .x))
   
   message("✅ main_df klar")
   
@@ -52,10 +52,8 @@ updateFoodWasteDatabase <- function(zip = "3450",
     
     df <- resraw2$clearances[[i]]
     
-    # tilføj store.id
     df$store.id <- resraw2$store.id[i]
     
-    # konverter tidspunkter til SQL-format
     datetime_cols <- c("offer.endTime", "offer.lastUpdate", "offer.startTime")
     for (col in datetime_cols) {
       if (col %in% names(df)) {
@@ -71,7 +69,6 @@ updateFoodWasteDatabase <- function(zip = "3450",
   
   all_clearances_df <- bind_rows(all_clearances)
   
-  # konverter alle . → _ til SQL-format
   all_clearances_sql <- all_clearances_df %>%
     rename_with(~ gsub("\\.", "_", .x))
   
@@ -109,3 +106,9 @@ updateFoodWasteDatabase <- function(zip = "3450",
   dbDisconnect(con)
   message("🎉 Database opdatering FÆRDIG! Alt kører nu.")
 }
+
+# ---------------------------------------------------------
+# KØR FUNKTIONEN (DENNE LINJE ER DET DER MANGLEDE)
+# ---------------------------------------------------------
+
+updateFoodWasteDatabase()
