@@ -80,8 +80,10 @@ updateFoodWasteDatabase <- function(zip = "3450",
     df
   })
   
+  # <-- DEN VIGTIGE DEL, DER MANGLEDE
+  all_clearances_df <- bind_rows(all_clearances)
+  
   all_clearances_sql <- all_clearances_df %>%
-    select(-product_categories_da) %>% 
     rename_with(~ gsub("\\.", "_", .x))
   
   cat("OK\n")
