@@ -1,0 +1,19 @@
+#Create table
+CREATE TABLE `store_clearances` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `store_id` VARCHAR(255) NULL,
+  `offer_discount` DOUBLE NULL,
+  `offer_endTime` DATETIME NULL,
+  `offer_lastUpdate` DATETIME NULL,
+  `offer_newPrice` DOUBLE NULL,
+  `offer_originalPrice` DOUBLE NULL,
+  `offer_percentDiscount` DOUBLE NULL,
+  `offer_startTime` DATETIME NULL,
+  `offer_stock` INT NULL,
+  `product_description` TEXT NULL,
+  `product_ean` VARCHAR(50) NULL,
+  `product_image` TEXT NULL,
+  `product_categories_en` MEDIUMTEXT NULL,
+  `product_categories_da` MEDIUMTEXT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
