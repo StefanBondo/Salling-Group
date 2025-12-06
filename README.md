@@ -1,4 +1,3 @@
-✅ README.md til dit repo
 # Salling Group – Anti Food Waste Datapipeline (AWS EC2)
 
 Dette projekt indsamler data fra Salling Groups *Anti Food Waste API* og gemmer dem i en MySQL-database på en AWS EC2 Ubuntu-instans. Projektet består af et automatiseret R-script, database-struktur samt logging, som dokumenterer at systemet kører uden brugerinteraktion.
