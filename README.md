@@ -119,25 +119,3 @@ INSERT INTO store_clearances (
   'Dairy > Milk > Organic', 'Mejeri > Mælk > Økologisk'
 );
 
-8. Dokumentation (bruges i opgaven)
-
-I rapporten skal inkluderes:
-
-Screenshot af AWS EC2 instance
-
-Inbound rules (port 22 + port 3306 for MySQL hvis nødvendigt)
-
-Screenshot af crontab -l
-
-Screenshot af MySQL SELECT hvor timestamps viser flere kørsler
-
-Logfil med mindst to succesfulde kørsler
-
-GitHub repo med R-script, sh-script og README
-
-9. Kontakt
-
-Projektet er udviklet til undervisningsbrug i forbindelse med dataindsamling via cloud-baserede løsninger.
-
-
----
