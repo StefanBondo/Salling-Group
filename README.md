@@ -1,93 +1,143 @@
-# Salling-Group
+✅ README.md til dit repo
+# Salling Group – Anti Food Waste Datapipeline (AWS EC2)
 
-Salling Group – Automated Foodwaste Data Pipeline
+Dette projekt indsamler data fra Salling Groups *Anti Food Waste API* og gemmer dem i en MySQL-database på en AWS EC2 Ubuntu-instans. Projektet består af et automatiseret R-script, database-struktur samt logging, som dokumenterer at systemet kører uden brugerinteraktion.
 
-This repository contains an automated R-based data pipeline developed for Salling Group.
-The pipeline fetches foodwaste and clearance data from an external API, cleans and transforms the datasets, and loads them into a MariaDB database running on an AWS EC2 instance.
+---
 
-The pipeline is designed for daily production use, and is executed automatically via a Linux cron job.
+## 1. Arkitektur (Overblik)
 
-📌 Features
+- **AWS EC2 (Ubuntu 22.04)**  
+  Kører alle scripts, MySQL og cron.
 
-Automated API ingestion using R
+- **MySQL Database (MariaDB)**  
+  Indeholder to tabeller:
+  - `main_df` (stamdata om butikker)
+  - `store_clearances` (variable data om nedsatte varer)
 
-Data cleaning, validation and transformation
+- **R + Rscript**  
+  Henter API-data, renser data og skriver til databasen.
 
-Writing processed datasets into MariaDB
+- **Cron job**  
+  Kører scriptet automatisk hver time.
 
-Logging of each pipeline run for monitoring
+- **Logging**  
+  Alt output fra cron gemmes i:  
+  `/var/log/foodwaste/update.log`
 
-Git versioning for reproducibility and change tracking
+---
 
-Fully automated execution via cron on an AWS EC2 Ubuntu server
+## 2. Filstruktur (i dette repo)
 
-🛠️ Tech Stack
 
-R (tidyverse, httr, jsonlite, DBI, RMariaDB)
 
-MariaDB on AWS EC2
+/Salling-Group
+│
+├── update_foodwaste.R # R-script der henter og gemmer data
+├── run_update.sh # Shell-script kaldt af cron
+├── update.log (valgfrit) # Lokal log (cron bruger ikke denne)
+└── README.md # Dokumentation (denne fil)
 
-Shell scripting for automation
 
-├── update_foodwaste.R     # Main R script – fetch, clean, write to DB
-├── logs/                  # Log output from each run
-├── cronjob.sh             # Shell script triggered by cron
-└── README.md              # Project documentation
+---
 
-⚙️ How It Works
-1. Fetch API Data
+## 3. R-script (update_foodwaste.R)
 
-The script retrieves fresh data from Salling Group’s API endpoints.
+R-scriptet gør følgende:
 
-2. Clean & Transform
+1. Kalder API’et for et valgt postnummer  
+2. Rydder og strukturerer data  
+3. Konverterer tidspunkter  
+4. Danner to datasæt:
+   - `main_df` (butiksinfo)
+   - `store_clearances` (varer og tilbud)
+5. Renamer kolonner (`.` → `_`)
+6. Skriver begge datasæt til MySQL  
+7. Logger succes/fejl til terminal (som cron fanger)
 
-Data is cleaned, validated, structured, and converted into production-ready tables.
+---
 
-3. Database Load
+## 4. run_update.sh
 
-The processed tables are written to a MariaDB database using DBI and RMariaDB.
+Dette script køres af cron hvert 60. minut:
 
-4. Logging
+```bash
+#!/bin/bash
 
-Each run produces a detailed log including:
+cd /home/ubuntu/git/Salling-Group
+git pull
 
-Timestamp
+/usr/bin/Rscript --vanilla /home/ubuntu/git/Salling-Group/update_foodwaste.R
 
-API connection status
+5. Cron opsætning
 
-Cleaning steps
+Cron-linjen for EC2 Ubuntu-brugeren:
 
-Database write results
+0 * * * * bash /home/ubuntu/git/Salling-Group/run_update.sh >> /var/log/foodwaste/update.log 2>&1
 
-5. Automation
 
-A cron job on the EC2 instance triggers a shell script, which runs the R pipeline once per day.
+Dette sikrer:
 
-🚀 Deployment
+Automatisk kørsel én gang i timen
 
-The pipeline runs automatically on an AWS EC2 Ubuntu instance.
+Logging til /var/log/foodwaste/update.log
 
-Example cron entry:
+At scriptet kører selv hvis serveren genstartes
 
-0 5 * * * /home/ubuntu/cronjob.sh
+6. Database Struktur
+main_df (stamdata)
+kolonne	type
+store_id	VARCHAR
+brand	VARCHAR
+name	VARCHAR
+city	VARCHAR
+street	VARCHAR
+zip	INT
+store_clearances (variable data)
+kolonne	type
+id	INT AUTO_INCREMENT
+store_id	VARCHAR
+offer_*	datetime/double/int
+product_description	TEXT
+product_ean	VARCHAR(50)
+product_image	TEXT
+product_categories_en	MEDIUMTEXT
+product_categories_da	MEDIUMTEXT
 
-📈 Purpose
+Begge kategori-felter blev opgraderet til MEDIUMTEXT, da API’et begyndte at sende meget store tekstfelter.
 
-This pipeline ensures:
+7. Eksempel på SQL INSERT (bruges til dokumentation)
+INSERT INTO store_clearances (
+  store_id, offer_discount, offer_endTime, offer_lastUpdate,
+  offer_newPrice, offer_originalPrice, offer_percentDiscount,
+  offer_startTime, offer_stock, product_description,
+  product_ean, product_image, product_categories_en, product_categories_da
+) VALUES (
+  '1234', 20.0, '2025-12-02 15:00:00', '2025-12-02 14:00:00',
+  10.00, 12.50, 20.0, '2025-12-02 10:00:00', 5, 'Testprodukt',
+  '1234567890123', 'https://example.com/img.jpg',
+  'Dairy > Milk > Organic', 'Mejeri > Mælk > Økologisk'
+);
 
-Reliable, repeatable daily ingestion
+8. Dokumentation (bruges i opgaven)
 
-Clean and structured data for analysis
+I rapporten skal inkluderes:
 
-A stable backend for dashboards, BI, and reporting
+Screenshot af AWS EC2 instance
 
-Better visibility into foodwaste and clearance trends
+Inbound rules (port 22 + port 3306 for MySQL hvis nødvendigt)
 
-👤 Author
+Screenshot af crontab -l
 
-Stefan Bondo
-Data Analysis student and developer of automated data workflows.
+Screenshot af MySQL SELECT hvor timestamps viser flere kørsler
 
-Cron scheduler for daily runs
+Logfil med mindst to succesfulde kørsler
 
-GitHub for version control
+GitHub repo med R-script, sh-script og README
+
+9. Kontakt
+
+Projektet er udviklet til undervisningsbrug i forbindelse med dataindsamling via cloud-baserede løsninger.
+
+
+---
