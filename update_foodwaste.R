@@ -2,7 +2,7 @@
 
 options(warn = -1)   # Fjern unødige warnings i cron
 
-updateFoodWasteDatabase <- function(zip = "3450",
+updateFoodWasteDatabase <- function(zip = "2500",
                                     sql_user = "ruser",
                                     sql_pass = "bondo123",
                                     sql_db   = "SallingGroupFoodWaste",
@@ -127,3 +127,4 @@ updateFoodWasteDatabase <- function(zip = "3450",
 
 # ---- RUN AUTOMATICALLY ----
 updateFoodWasteDatabase()
+
