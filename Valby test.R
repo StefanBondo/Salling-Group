@@ -73,36 +73,39 @@ updateFoodWasteDatabase <- function(zip,
   cat("OK\n")
   
   # ---- CLEAN CLEARANCES ----
-  cat("Renser clearances... ")
-  
-  all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
+cat("Renser clearances... ")
+
+all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
     
     df <- resraw2$clearances[[i]]
-    
+
+    # 🚨 FIX: Skip stores with no clearances
+    if (is.null(df) || nrow(df) == 0) {
+        return(NULL)
+    }
+
     df$store.id   <- resraw2$store.id[i]
     df$store.name <- resraw2$store.name[i]
-    
+
     datetime_cols <- c("offer.endTime", "offer.lastUpdate", "offer.startTime")
     for (col in datetime_cols) {
-      if (col %in% names(df)) {
-        df[[col]] <- format(
-          as.POSIXct(df[[col]], format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
-          "%Y-%m-%d %H:%M:%S"
-        )
-      }
+        if (col %in% names(df)) {
+            df[[col]] <- format(
+                as.POSIXct(df[[col]], format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
+                "%Y-%m-%d %H:%M:%S"
+            )
+        }
     }
-    
+
     df <- df %>% select(store.id, store.name, everything())
-    
+
     df
-  })
-  
-  clearance_df <- bind_rows(all_clearances)
-  
-  clearance_df <- clearance_df %>%
-    rename_with(~ gsub("\\.", "_", .x))
-  
-  cat("OK\n")
+})
+
+clearance_df <- bind_rows(all_clearances)
+clearance_df <- clearance_df %>% rename_with(~ gsub("\\.", "_", .x))
+
+cat("OK\n")
   
   # ---- WRITE TO DATABASE ----
   cat("Forbinder til MariaDB... ")
