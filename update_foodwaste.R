@@ -128,3 +128,16 @@ updateFoodWasteDatabase <- function(zip = "2500",
 # ---- RUN AUTOMATICALLY ----
 updateFoodWasteDatabase()
 
+
+
+con <- dbConnect(
+  RMariaDB::MariaDB(),
+  dbname   = "SallingValby",
+  host     = "localhost",
+  user     = "root",
+  password = "bondo123",
+  port     = 3306
+)
+
+dbListTables(con)
+
