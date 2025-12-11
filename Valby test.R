@@ -20,8 +20,8 @@ cat("➡️  Bruger postnummer:", zip, "\n\n")
 
 
 updateFoodWasteDatabase <- function(zip,
-                                    sql_user = "root",
-                                    sql_pass = "bondo123",
+                                    sql_user = "salling",
+                                    sql_pass = "ValbyStrongPassword123!",
                                     sql_db   = "SallingValby",
                                     sql_host = "localhost",
                                     sql_port = 3306) {
