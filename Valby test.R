@@ -72,11 +72,11 @@ updateFoodWasteDatabase <- function(zip,
   
   cat("OK\n")
   
-  # ---- CLEAN CLEARANCES ----
+# ---- CLEAN CLEARANCES ----
 cat("Renser clearances... ")
 
 all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
-    
+
     df <- resraw2$clearances[[i]]
 
     # 🚨 FIX: Skip stores with no clearances
@@ -99,13 +99,14 @@ all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
 
     df <- df %>% select(store.id, store.name, everything())
 
-    df
+    return(df)
 })
 
 clearance_df <- bind_rows(all_clearances)
 clearance_df <- clearance_df %>% rename_with(~ gsub("\\.", "_", .x))
 
 cat("OK\n")
+
   
   # ---- WRITE TO DATABASE ----
   cat("Forbinder til MariaDB... ")
