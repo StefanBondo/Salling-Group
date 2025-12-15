@@ -1,141 +1,149 @@
-#!/usr/bin/env Rscript
-
-if (!interactive()) {
-  View <- function(...) NULL  # Disable View() in non-interactive mode
-}
-
-
-options(warn = -1)
-
-# ---- COMMAND LINE ARGUMENT ----
+# --------------------------------------------------
+# COMMAND LINE ARGUMENT (ELLER LOKAL DEFAULT)
+# --------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) == 0) {
-  zip <- "2500"  # default hvis ikke man giver et argument
+  zip <- "2500"
 } else {
   zip <- args[1]
 }
 
-cat("➡️  Bruger postnummer:", zip, "\n\n")
+cat("➡️ Bruger postnummer:", zip, "\n")
 
+# --------------------------------------------------
+# PAKKER
+# --------------------------------------------------
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(purrr)
+library(DBI)
+library(RMariaDB)
 
-updateFoodWasteDatabase <- function(zip,
-                                    sql_user = "salling",
-                                    sql_pass = "ValbyStrongPassword123!",
-                                    sql_db   = "SallingValby",
-                                    sql_host = "localhost",
-                                    sql_port = 3306) {
-  
-  # ---- TIMESTAMP ----
-  start_time <- Sys.time()
-  cat("\n===========================\n")
-  cat("🚀 Kørsel startet:", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n")
-  cat("===========================\n\n")
-  
-  # ---- LOAD PACKAGES ----
-  suppressMessages({
-    library(httr)
-    library(jsonlite)
-    library(dplyr)
-    library(purrr)
-    library(RMariaDB)
-  })
-  
-  # ---- API CALL ----
-  cat("Henter API data for", zip, "... ")
-  
-  baseurl <- "https://api.sallinggroup.com/v1/food-waste/?zip="
-  fullurl <- paste0(baseurl, zip)
-  token <- 'SG_APIM_76MCVAWZZSB0423GN2FE25FWNMYAXV4JB5AMTQD6EJERP8XD4E20'
-  
-  res <- GET(fullurl, add_headers(Authorization = paste("Bearer", token)))
-  resraw <- content(res, as = "text")
-  resraw2 <- fromJSON(resraw, flatten = TRUE)
-  
-  cat("OK\n")
-  
-  # ---- CLEAN MAIN_DF ----
-  cat("Renser main_df... ")
-  
-  main_df <- resraw2 %>% as.data.frame()
-  
-  main_df_clean <- main_df %>%
-    select(
-      store.id,
-      store.brand,
-      store.name,
-      store.address.city,
-      store.address.street,
-      store.address.zip
-    ) %>%
-    rename_with(~ gsub("\\.", "_", .x))
-  
-  cat("OK\n")
-  
-# ---- CLEAN CLEARANCES ----
-cat("Renser clearances... ")
+# --------------------------------------------------
+# API CALL
+# --------------------------------------------------
+baseurl <- "https://api.sallinggroup.com/v1/food-waste/?zip="
+fullurl <- paste0(baseurl, zip)
 
-all_clearances <- lapply(seq_along(resraw2$store.id), function(i) {
+token <- "SG_APIM_76MCVAWZZSB0423GN2FE25FWNMYAXV4JB5AMTQD6EJERP8XD4E20"
 
-    df <- resraw2$clearances[[i]]
+res <- GET(
+  fullurl,
+  add_headers(Authorization = paste("Bearer", token))
+)
 
-    # 🚨 FIX: Skip stores with no clearances
+cat("HTTP status:", status_code(res), "\n")
+
+resraw  <- content(res, as = "text")
+resraw2 <- fromJSON(resraw, flatten = TRUE)
+
+# --------------------------------------------------
+# CLEARANCES (NESTED)
+# --------------------------------------------------
+resraw2$clearances <- map2(
+  resraw2$clearances,
+  resraw2$store.id,
+  ~{
+    df <- .x
+    
     if (is.null(df) || nrow(df) == 0) {
-        return(NULL)
+      return(data.frame())
     }
+    
+    df$store.id <- .y
+    df <- df %>% select(store.id, everything())
+    
+    df <- df %>% select(
+      -offer.currency,
+      -offer.stockUnit,
+      -offer.ean,
+      -product.categories.da
+    )
+    
+    df
+  }
+)
 
-    df$store.id   <- resraw2$store.id[i]
-    df$store.name <- resraw2$store.name[i]
-
-    datetime_cols <- c("offer.endTime", "offer.lastUpdate", "offer.startTime")
-    for (col in datetime_cols) {
-        if (col %in% names(df)) {
-            df[[col]] <- format(
-                as.POSIXct(df[[col]], format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
-                "%Y-%m-%d %H:%M:%S"
-            )
-        }
-    }
-
-    df <- df %>% select(store.id, store.name, everything())
-
-    return(df)
-})
-
-clearance_df <- bind_rows(all_clearances)
-clearance_df <- clearance_df %>% rename_with(~ gsub("\\.", "_", .x))
-
-cat("OK\n")
-
-  
-  # ---- WRITE TO DATABASE ----
-  cat("Forbinder til MariaDB... ")
-  
-  con <- dbConnect(
-    RMariaDB::MariaDB(),
-    user = sql_user,
-    password = sql_pass,
-    host = sql_host,
-    port = sql_port,
-    dbname = sql_db
+# --------------------------------------------------
+# MAIN_DF (MED NESTED CLEARANCES)
+# --------------------------------------------------
+main_df <- resraw2 %>%
+  as.data.frame() %>%
+  select(
+    -store.hours,
+    -store.type,
+    -store.coordinates,
+    -store.address.country,
+    -store.address.extra
   )
-  
-  cat("OK\n")
-  
-  cat("Skriver main_df... ")
-  dbWriteTable(con, "main_df", main_df_clean, append = TRUE, row.names = FALSE)
-  cat("OK\n")
-  
-  cat("Skriver clearance_df... ")
-  dbWriteTable(con, "clearance_df", clearance_df, append = TRUE, row.names = FALSE)
-  cat("OK\n")
-  
-  dbDisconnect(con)
-  
-  end_time <- Sys.time()
-  cat("\n🎉 Kørsel færdig:", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n")
-  cat("===========================\n\n")
-}
 
-# ---- RUN FUNCTION ----
-updateFoodWasteDatabase(zip)
+# --------------------------------------------------
+# CLEARANCE_DF (FLAD)
+# --------------------------------------------------
+clearance_df <- bind_rows(resraw2$clearances)
+
+# --------------------------------------------------
+# DATETIME → SQL FORMAT
+# --------------------------------------------------
+clearance_df <- clearance_df %>%
+  mutate(
+    offer.endTime = as.POSIXct(offer.endTime, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
+    offer.lastUpdate = as.POSIXct(offer.lastUpdate, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
+    offer.startTime = as.POSIXct(offer.startTime, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+  ) %>%
+  mutate(
+    offer.endTime = format(offer.endTime, "%Y-%m-%d %H:%M:%S"),
+    offer.lastUpdate = format(offer.lastUpdate, "%Y-%m-%d %H:%M:%S"),
+    offer.startTime = format(offer.startTime, "%Y-%m-%d %H:%M:%S")
+  )
+
+# --------------------------------------------------
+# SQL-KOMPATIBLE KOLONNENAVNE
+# --------------------------------------------------
+main_df_sql <- main_df %>%
+  select(-clearances) %>%
+  rename_with(~ gsub("\\.", "_", .x))
+
+clearance_df_sql <- clearance_df %>%
+  rename_with(~ gsub("\\.", "_", .x))
+
+# --------------------------------------------------
+# DATABASE CONNECTION
+# --------------------------------------------------
+con <- dbConnect(
+  RMariaDB::MariaDB(),
+  host     = "localhost",
+  dbname   = "SallingValby",
+  user     = "root",
+  password = "bondo123",
+  port     = 3306
+)
+
+# --------------------------------------------------
+# DBWRITE (MANUELT – INGEN LOOP)
+# --------------------------------------------------
+dbWriteTable(
+  con,
+  name = "main_df",
+  value = main_df_sql,
+  append = TRUE,
+  row.names = FALSE
+)
+
+dbWriteTable(
+  con,
+  name = "clearance_df",
+  value = clearance_df_sql,
+  append = TRUE,
+  row.names = FALSE
+)
+
+dbDisconnect(con)
+
+# --------------------------------------------------
+# VIS LOKALT
+# --------------------------------------------------
+View(main_df)
+View(clearance_df)
