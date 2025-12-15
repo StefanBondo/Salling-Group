@@ -1,35 +1,51 @@
 # --------------------------------------------------
-# COMMAND LINE ARGUMENT (ELLER LOKAL DEFAULT)
+# DEAKTIVER View() PÅ SERVER
 # --------------------------------------------------
-
 if (!interactive()) {
   View <- function(...) NULL
 }
 
+options(warn = -1)
 
+# --------------------------------------------------
+# COMMAND LINE ARGUMENT
+# --------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) == 0) {
-  zip <- "2500"
+  zip <- "3450"
 } else {
   zip <- args[1]
 }
 
-cat("➡️ Bruger postnummer:", zip, "\n")
+# --------------------------------------------------
+# TIMESTAMP START
+# --------------------------------------------------
+start_time <- Sys.time()
+
+cat("\n===========================\n")
+cat("🚀 Kørsel startet:", format(start_time, "%Y-%m-%d %H:%M:%S"), "\n")
+cat("===========================\n\n")
+
+cat("➡️  Bruger postnummer:", zip, "\n\n")
 
 # --------------------------------------------------
 # PAKKER
 # --------------------------------------------------
-library(httr)
-library(jsonlite)
-library(dplyr)
-library(purrr)
-library(DBI)
-library(RMariaDB)
+suppressMessages({
+  library(httr)
+  library(jsonlite)
+  library(dplyr)
+  library(purrr)
+  library(DBI)
+  library(RMariaDB)
+})
 
 # --------------------------------------------------
 # API CALL
 # --------------------------------------------------
+cat("Henter API data for", zip, "... ")
+
 baseurl <- "https://api.sallinggroup.com/v1/food-waste/?zip="
 fullurl <- paste0(baseurl, zip)
 
@@ -40,41 +56,38 @@ res <- GET(
   add_headers(Authorization = paste("Bearer", token))
 )
 
-cat("HTTP status:", status_code(res), "\n")
+if (status_code(res) != 200) {
+  stop("API-kald fejlede")
+}
+
+cat("OK\n")
 
 resraw  <- content(res, as = "text")
 resraw2 <- fromJSON(resraw, flatten = TRUE)
 
 # --------------------------------------------------
-# CLEARANCES (NESTED)
+# MAIN_DF
 # --------------------------------------------------
+cat("Renser main_df... ")
+
 resraw2$clearances <- map2(
   resraw2$clearances,
   resraw2$store.id,
   ~{
     df <- .x
-    
-    if (is.null(df) || nrow(df) == 0) {
-      return(data.frame())
-    }
-    
+    if (is.null(df) || nrow(df) == 0) return(data.frame())
     df$store.id <- .y
     df <- df %>% select(store.id, everything())
-    
     df <- df %>% select(
       -offer.currency,
       -offer.stockUnit,
       -offer.ean,
       -product.categories.da
     )
-    
     df
   }
 )
 
-# --------------------------------------------------
-# MAIN_DF (MED NESTED CLEARANCES)
-# --------------------------------------------------
 main_df <- resraw2 %>%
   as.data.frame() %>%
   select(
@@ -85,25 +98,23 @@ main_df <- resraw2 %>%
     -store.address.extra
   )
 
-# --------------------------------------------------
-# CLEARANCE_DF (FLAD)
-# --------------------------------------------------
-clearance_df <- bind_rows(resraw2$clearances)
+cat("OK\n")
 
 # --------------------------------------------------
-# DATETIME → SQL FORMAT
+# CLEARANCE_DF
 # --------------------------------------------------
+cat("Renser clearances... ")
+
+clearance_df <- bind_rows(resraw2$clearances)
+
 clearance_df <- clearance_df %>%
   mutate(
-    offer.endTime = as.POSIXct(offer.endTime, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
-    offer.lastUpdate = as.POSIXct(offer.lastUpdate, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
-    offer.startTime = as.POSIXct(offer.startTime, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
-  ) %>%
-  mutate(
-    offer.endTime = format(offer.endTime, "%Y-%m-%d %H:%M:%S"),
-    offer.lastUpdate = format(offer.lastUpdate, "%Y-%m-%d %H:%M:%S"),
-    offer.startTime = format(offer.startTime, "%Y-%m-%d %H:%M:%S")
+    offer.endTime = format(as.POSIXct(offer.endTime, tz = "UTC"), "%Y-%m-%d %H:%M:%S"),
+    offer.lastUpdate = format(as.POSIXct(offer.lastUpdate, tz = "UTC"), "%Y-%m-%d %H:%M:%S"),
+    offer.startTime = format(as.POSIXct(offer.startTime, tz = "UTC"), "%Y-%m-%d %H:%M:%S")
   )
+
+cat("OK\n")
 
 # --------------------------------------------------
 # SQL-KOMPATIBLE KOLONNENAVNE
@@ -116,37 +127,41 @@ clearance_df_sql <- clearance_df %>%
   rename_with(~ gsub("\\.", "_", .x))
 
 # --------------------------------------------------
-# DATABASE CONNECTION
+# DATABASE
 # --------------------------------------------------
+cat("Forbinder til MariaDB... ")
+
 con <- dbConnect(
   RMariaDB::MariaDB(),
   host     = "localhost",
   dbname   = "SallingValby",
   user     = "root",
-  password = "bondo123",
+  password = Sys.getenv("localpw"),
   port     = 3306
 )
 
-# --------------------------------------------------
-# DBWRITE (MANUELT – INGEN LOOP)
-# --------------------------------------------------
-dbWriteTable(
-  con,
-  name = "main_df",
-  value = main_df_sql,
-  append = TRUE,
-  row.names = FALSE
-)
+cat("OK\n")
 
-dbWriteTable(
-  con,
-  name = "clearance_df",
-  value = clearance_df_sql,
-  append = TRUE,
-  row.names = FALSE
-)
+# --------------------------------------------------
+# WRITE TABLES
+# --------------------------------------------------
+cat("Skriver main_df... ")
+dbWriteTable(con, "main_df", main_df_sql, append = TRUE, row.names = FALSE)
+cat("OK\n")
+
+cat("Skriver clearance_df... ")
+dbWriteTable(con, "clearance_df", clearance_df_sql, append = TRUE, row.names = FALSE)
+cat("OK\n")
 
 dbDisconnect(con)
+
+# --------------------------------------------------
+# TIMESTAMP SLUT
+# --------------------------------------------------
+end_time <- Sys.time()
+
+cat("\n🎉 Kørsel færdig:", format(end_time, "%Y-%m-%d %H:%M:%S"), "\n")
+cat("===========================\n\n")
 
 # --------------------------------------------------
 # VIS LOKALT
