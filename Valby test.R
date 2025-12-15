@@ -1,6 +1,12 @@
 # --------------------------------------------------
 # COMMAND LINE ARGUMENT (ELLER LOKAL DEFAULT)
 # --------------------------------------------------
+
+if (!interactive()) {
+  View <- function(...) NULL
+}
+
+
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) == 0) {
