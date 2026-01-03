@@ -1,120 +1,146 @@
-# Salling Group – Anti Food Waste Datapipeline (AWS EC2)
+🛒 Salling Group – Anti Food Waste Data Pipeline
+📌 Project Overview
 
-Dette projekt indsamler data fra Salling Groups *Anti Food Waste API* og gemmer dem i en MySQL-database på en AWS EC2 Ubuntu-instans. Projektet består af et automatiseret R-script, database-struktur samt logging, som dokumenterer at systemet kører uden brugerinteraktion.
+This project demonstrates a complete end-to-end data pipeline for collecting, processing, storing, and analysing Anti Food Waste offers from the Salling Group API.
 
----
+The solution is designed to run both locally and on a Linux server (Ubuntu / AWS EC2) and focuses on automation, reproducibility, and clean data handling.
 
-## 1. Arkitektur (Overblik)
+Developed as part of an academic examination
 
-- **AWS EC2 (Ubuntu 22.04)**  
-  Kører alle scripts, MySQL og cron.
+Awarded the highest grade (12) for technical implementation and structure
 
-- **MySQL Database (MariaDB)**  
-  Indeholder to tabeller:
-  - `main_df` (stamdata om butikker)
-  - `store_clearances` (variable data om nedsatte varer)
+🎯 Project Purpose
 
-- **R + Rscript**  
-  Henter API-data, renser data og skriver til databasen.
+The project aims to:
 
-- **Cron job**  
-  Kører scriptet automatisk hver time.
+Automatically collect Anti Food Waste data by postcode
 
-- **Logging**  
-  Alt output fra cron gemmes i:  
-  `/var/log/foodwaste/update.log`
+Store structured data in a relational database
 
----
+Enable analysis of:
 
-## 2. Filstruktur (i dette repo)
+product types
 
+time-based patterns
 
+Demonstrate real-world data engineering workflows
 
-/Salling-Group
+⚙️ Key Features
+
+API ingestion using the Salling Group Food Waste API
+
+Parameterised execution via command line arguments
+
+Automated execution using cron
+
+Execution logging for monitoring and debugging
+
+Secure credential handling using environment variables
+
+Separation of:
+
+data collection
+
+processing logic
+
+data storage
+
+🧰 Tech Stack
+
+R – data collection and transformation
+
+MariaDB / MySQL – relational data storage
+
+Ubuntu Linux – server environment
+
+AWS EC2 – cloud hosting
+
+Git & GitHub – version control and deployment
+
+cron – task scheduling and automation
+
+📁 Project Structure
+Salling-Group/
 │
-├── update_foodwaste.R # R-script der henter og gemmer data
-├── run_update.sh # Shell-script kaldt af cron
-├── update.log (valgfrit) # Lokal log (cron bruger ikke denne)
-└── README.md # Dokumentation (denne fil)
+├── Valby test.R           # Main data pipeline script
+├── update.log             # Log file from scheduled runs
+├── README.md              # Project documentation
+├── main_df.xlsx           # Example output (local testing)
+├── main_clearances.xlsx   # Example output (local testing)
+└── SQL/                   # SQL table definitions (optional)
 
+🔄 How the Pipeline Works
 
----
+Reads postcode from the command line
 
-## 3. R-script (update_foodwaste.R)
+Fetches Anti Food Waste data from the API
 
-R-scriptet gør følgende:
+Cleans and structures store and offer data
 
-1. Kalder API’et for et valgt postnummer  
-2. Rydder og strukturerer data  
-3. Konverterer tidspunkter  
-4. Danner to datasæt:
-   - `main_df` (butiksinfo)
-   - `store_clearances` (varer og tilbud)
-5. Renamer kolonner (`.` → `_`)
-6. Skriver begge datasæt til MySQL  
-7. Logger succes/fejl til terminal (som cron fanger)
+Converts timestamps from ISO 8601 to SQL datetime
 
----
+Writes data to the database:
 
-## 4. run_update.sh
+main_df (stores)
 
-Dette script køres af cron hvert 60. minut:
+clearance_df (offers)
 
-```bash
-#!/bin/bash
+Logs execution status and timestamps
 
-cd /home/ubuntu/git/Salling-Group
-git pull
+▶️ Running the Script
+Manual execution
+Rscript "Valby test.R" 2500
 
-/usr/bin/Rscript --vanilla /home/ubuntu/git/Salling-Group/update_foodwaste.R
+Manual execution with logging
+Rscript "Valby test.R" 2500 >> update.log 2>&1
 
-5. Cron opsætning
+Automated execution (cron – hourly example)
+0 * * * * /usr/bin/Rscript /home/ubuntu/git/Salling-Group/Valby\ test.R 2500 >> /home/ubuntu/git/Salling-Group/update.log 2>&1
 
-Cron-linjen for EC2 Ubuntu-brugeren:
+🗄️ Database Design
 
-0 * * * * bash /home/ubuntu/git/Salling-Group/run_update.sh >> /var/log/foodwaste/update.log 2>&1
+main_df
 
+One row per store
 
-Dette sikrer:
+Primary key: store_id
 
-Automatisk kørsel én gang i timen
+clearance_df
 
-Logging til /var/log/foodwaste/update.log
+One row per offer
 
-At scriptet kører selv hvis serveren genstartes
+Linked to stores via store_id
 
-6. Database Struktur
-main_df (stamdata)
-kolonne	type
-store_id	VARCHAR
-brand	VARCHAR
-name	VARCHAR
-city	VARCHAR
-street	VARCHAR
-zip	INT
-store_clearances (variable data)
-kolonne	type
-id	INT AUTO_INCREMENT
-store_id	VARCHAR
-offer_*	datetime/double/int
-product_description	TEXT
-product_ean	VARCHAR(50)
-product_image	TEXT
-product_categories_en	MEDIUMTEXT
-product_categories_da	MEDIUMTEXT
+This structure supports:
 
-Begge kategori-felter blev opgraderet til MEDIUMTEXT, da API’et begyndte at sende meget store tekstfelter.
+efficient SQL queries
 
-7. Eksempel på SQL INSERT (bruges til dokumentation)
-INSERT INTO store_clearances (
-  store_id, offer_discount, offer_endTime, offer_lastUpdate,
-  offer_newPrice, offer_originalPrice, offer_percentDiscount,
-  offer_startTime, offer_stock, product_description,
-  product_ean, product_image, product_categories_en, product_categories_da
-) VALUES (
-  '1234', 20.0, '2025-12-02 15:00:00', '2025-12-02 14:00:00',
-  10.00, 12.50, 20.0, '2025-12-02 10:00:00', 5, 'Testprodukt',
-  '1234567890123', 'https://example.com/img.jpg',
-  'Dairy > Milk > Organic', 'Mejeri > Mælk > Økologisk'
-);
+downstream analysis in R
 
+scalable data collection
+
+🔐 Security & Best Practices
+
+Database credentials handled via Sys.getenv()
+
+No secrets committed to GitHub
+
+Same codebase runs locally and on server
+
+Absolute paths used for cron execution
+
+🚀 Possible Extensions
+
+Support for multiple postcodes per run
+
+Deduplication and historical tracking
+
+Dashboard visualisation (Power BI / Shiny)
+
+Predictive modelling of offer timing
+
+Integration with additional data sources
+
+👤 Author
+
+Stefan Torp Bondo
