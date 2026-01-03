@@ -59,6 +59,7 @@ Git & GitHub – version control and deployment
 
 cron – task scheduling and automation
 
+```bash
 📁 Project Structure
 Salling-Group/
 │
@@ -68,6 +69,7 @@ Salling-Group/
 ├── main_df.xlsx           # Example output (local testing)
 ├── main_clearances.xlsx   # Example output (local testing)
 └── SQL/                   # SQL table definitions (optional)
+```
 
 🔄 How the Pipeline Works
 
@@ -88,7 +90,7 @@ clearance_df (offers)
 Logs execution status and timestamps
 
 ▶️ Running the Script
-Manual execution
+```bash
 Rscript "Valby test.R" 2500
 
 Manual execution with logging
@@ -96,6 +98,7 @@ Rscript "Valby test.R" 2500 >> update.log 2>&1
 
 Automated execution (cron – hourly example)
 0 * * * * /usr/bin/Rscript /home/ubuntu/git/Salling-Group/Valby\ test.R 2500 >> /home/ubuntu/git/Salling-Group/update.log 2>&1
+```
 
 🗄️ Database Design
 
